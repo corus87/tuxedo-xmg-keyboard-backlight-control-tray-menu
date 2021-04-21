@@ -51,5 +51,5 @@ To use the kernel module you have to compile your own module and add your device
 
 [Check out my branch of the kernel module](https://github.com/corus87/tuxedo-keyboard/blob/fbf0b2ed79af0a11805e53a2fb7d2bc89b83a04f/src/uniwill_keyboard.h#L458) with added support for the XMG Core 15.
 
-You can get your board name by running `cat /sys/class/dmi/id/board_name`, on the XMG Core 15 E21 the output is `GK5NxxO M20`. 
+You can get your board name by running `cat /sys/class/dmi/id/board_name`, on the XMG Core 15 the output is `GK5NxxO M20`. 
 
