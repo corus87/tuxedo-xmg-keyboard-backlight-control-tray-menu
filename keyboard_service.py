@@ -12,6 +12,9 @@ def getCurrentBrightness():
     # Using regex to get the current brightness
     #with open(CONFIG_FILE) as f:    
     #    return re.search('brightness=([^\s]+)', f.read()).group(1).strip()
+    
+    # Get the brightness from sys, instead from the config file, 
+    # since changing brightness with FN+Space won't write it to the config
     cl = subprocess.run(["cat", "/sys/devices/platform/tuxedo_keyboard/uw_kbd_bl_color/brightness"], stdout=subprocess.PIPE)
     return cl.stdout.decode("UTF-8").strip()
     
@@ -81,9 +84,8 @@ skip_check = False
 if os.getuid() != 0:
     print("This script needs root permission. Change to root or use sudo.")
     sys.exit()
-
-
-parser = argparse.ArgumentParser(description='Set color for Tuxedo Polaris and XMG Core E21 (XMG Core needs a customized version of tuxedo-keyboard with added DMI_BOARD_NAME of the used XMG Core)')
+    
+parser = argparse.ArgumentParser(description='Set color for Tuxedo Polaris and XMG Core (XMG Core needs a customized version of tuxedo-keyboard with added DMI_BOARD_NAME of the used XMG Core)')
 parser.add_argument('--set_color', help="Supported Colors: BLACK, RED, GREEN, BLUE, YELLOW, MAGENTA, CYAN, WHITE")
 parser.add_argument('--set_brightness', help="Any integer between 0-200.")
 parser.add_argument('--get_color', action="store_true", help="Returns current color.")
