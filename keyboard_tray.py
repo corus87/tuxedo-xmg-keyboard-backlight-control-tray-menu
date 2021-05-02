@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction
+from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction, QDialog, QGridLayout
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QThread
 from time import sleep
@@ -18,12 +18,22 @@ class CheckCurrentStates(QThread):
     def run(self):
         current_color = None
         current_brightness = None
+        display_dimmed = False
         while True:
-            color, brightness = self.main.getStates()
-            if color != current_color or brightness != current_brightness:
-                current_color = color
-                current_brightness = brightness
-                self.main.updateMenu(color=color, brightness=brightness)
+            if not display_dimmed:
+                color, brightness = self.main.getStates()
+                if color != current_color or brightness != current_brightness:
+                    current_color = color
+                    current_brightness = brightness
+                    self.main.updateMenu(color=color, brightness=brightness)
+
+                if self.main.getDisplayBrightness() == "Off":
+                    self.main.setBrightness(0)
+                    display_dimmed = True
+            else:
+                if self.main.getDisplayBrightness() == "On":
+                    self.main.setBrightness(current_brightness)
+                    display_dimmed = False
             sleep(1)
 
 class KeyboardColor(QSystemTrayIcon):
@@ -31,8 +41,8 @@ class KeyboardColor(QSystemTrayIcon):
         super().__init__()  
         main_menu = QMenu()
 
-        self.color_menu = main_menu.addMenu("Color")
-        self.brightness_menu = main_menu.addMenu("Brightness")
+        self.color_menu = main_menu.addMenu("Farbe")
+        self.brightness_menu = main_menu.addMenu("Helligkeit")
         self.addColorMenu()
         self.addBrightnessMenu()
         
@@ -41,7 +51,7 @@ class KeyboardColor(QSystemTrayIcon):
 
         main_menu.addSeparator()
 
-        self.exit_button = QAction("Exit")
+        self.exit_button = QAction("Beenden")
         self.exit_button.triggered.connect(app.quit)
         
         main_menu.addAction(self.exit_button)
@@ -51,9 +61,10 @@ class KeyboardColor(QSystemTrayIcon):
         if brightness < 0:
             self.brightness_save_state = brightness
         else:
+            self.setIcon(QIcon("keyboard-off.png"))
             self.brightness_save_state = 30
 
-        self.setIcon(QIcon("icons/keyboard-on.png"))
+        self.setIcon(QIcon("keyboard-on.png"))
         self.setVisible(True)
         self.setToolTip("Keyboard-backlight")
         self.setContextMenu(main_menu)
@@ -86,9 +97,9 @@ class KeyboardColor(QSystemTrayIcon):
 
         if brightness is not None:
             if brightness == 0:
-                self.setIcon(QIcon("icons/keyboard-off.png"))
+                self.setIcon(QIcon("keyboard-off.png"))
             else:
-                self.setIcon(QIcon("icons/keyboard-on.png"))
+                self.setIcon(QIcon("keyboard-on.png"))
 
             self.set_zero.setChecked(True if brightness == 0 else False)
             self.set_zero.setEnabled(False if brightness == 0 else True)
@@ -114,16 +125,16 @@ class KeyboardColor(QSystemTrayIcon):
             self.set_hundred.setEnabled(False if brightness == 100 else True)
 
     def addColorMenu(self):
-        self.set_red = QAction("Red")
+        self.set_red = QAction("Rot")
         self.set_red.setCheckable(True)
         self.set_red.triggered.connect(lambda: self.setColor("red"))
-        self.set_green = QAction("Green")
+        self.set_green = QAction("Grün")
         self.set_green.setCheckable(True)
         self.set_green.triggered.connect(lambda: self.setColor("green"))
-        self.set_blue = QAction("Blue")
+        self.set_blue = QAction("Blau")
         self.set_blue.setCheckable(True)
         self.set_blue.triggered.connect(lambda: self.setColor("blue"))
-        self.set_yellow = QAction("Yellow")
+        self.set_yellow = QAction("Gelb")
         self.set_yellow.setCheckable(True)
         self.set_yellow.triggered.connect(lambda: self.setColor("yellow"))
         self.set_magenta = QAction("Magenta")
@@ -132,7 +143,7 @@ class KeyboardColor(QSystemTrayIcon):
         self.set_cyan = QAction("Cyan")
         self.set_cyan.setCheckable(True)
         self.set_cyan.triggered.connect(lambda: self.setColor("cyan"))
-        self.set_white = QAction("White")
+        self.set_white = QAction("Weiß")
         self.set_white.setCheckable(True)
         self.set_white.triggered.connect(lambda: self.setColor("white"))
         self.color_menu.addAction(self.set_red)
@@ -190,25 +201,37 @@ class KeyboardColor(QSystemTrayIcon):
         self.brightness_menu.addAction(self.set_hundred)
 
     def setBrightness(self, brightness):
-        cĺ, current_brightness = self.getStates()
-        # Get a smooth fade when changing color with a step of 10%
-        if current_brightness < brightness:
-            for i in range(current_brightness, brightness * 2 + 10, 10):
-                subprocess.call(["sudo", "./keyboard_service.py", "--set_brightness", str(i), "--skip_config_check"])
-        else:
-            for i in range(current_brightness, brightness * 2 - 10, -10):
+        cĺ, cb = self.getStates()
+        to_set = brightness * 2
+        current_brightness = cb * 2
+
+        # Fade in steps 20 
+        if to_set > current_brightness:
+            for i in range(current_brightness, to_set, 20):
                 subprocess.call(["sudo", "./keyboard_service.py", "--set_brightness", str(i), "--skip_config_check"])
 
+        else:
+            for i in range(current_brightness, to_set, -20):
+                subprocess.call(["sudo", "./keyboard_service.py", "--set_brightness", str(i), "--skip_config_check"])
+
+        # Set final brightness
+        subprocess.call(["sudo", "./keyboard_service.py", "--set_brightness", str(to_set), "--skip_config_check"])
+        
     def setColor(self, color):
         subprocess.call(["sudo", "./keyboard_service.py", "--set_color", color])
 
     def getStates(self):
-        cl = subprocess.run(["sudo", "./keyboard_service.py", "--get_color", "--skip_config_check"], stdout=subprocess.PIPE)
+        cl = subprocess.run(["./keyboard_service.py", "--get_color", "--skip_config_check"], stdout=subprocess.PIPE)
         color = cl.stdout.decode("UTF-8").strip()
 
-        bs = subprocess.run(["sudo", "./keyboard_service.py", "--get_brightness", "--skip_config_check"], stdout=subprocess.PIPE)
+        bs = subprocess.run(["./keyboard_service.py", "--get_brightness", "--skip_config_check"], stdout=subprocess.PIPE)
         brightness = int(bs.stdout.decode("UTF-8")) // 2
+
         return color, round(brightness, -1)
+
+    def getDisplayBrightness(self):
+        cl = subprocess.run(["xset", "q"], stdout=subprocess.PIPE)
+        return re.search('Monitor is (.*)', cl.stdout.decode("UTF-8")).group(1)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
